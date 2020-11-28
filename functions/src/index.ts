@@ -1,7 +1,10 @@
 import * as functions from 'firebase-functions'
 import * as admin from 'firebase-admin'
+// import axios from 'axios'
 
 admin.initializeApp()
+
+const { logger } = functions
 
 // Start writing Firebase Functions
 // https://firebase.google.com/docs/functions/typescript
@@ -28,14 +31,25 @@ export const writeData = functions.https.onRequest(
 )
 
 export const mockUser = functions.https.onRequest(async (request, response) => {
+  // const res = await axios.get('https://randomuser.me/api/')
+  // const mockData = res.data.results[0]
+  // const email = mockData.email
+  // const displayName = `${mockData.name.first} ${mockData.name.last}`
   const email = 'a@whynotben.com'
-  const password = 'sm00thiesORdie1117'
+  const displayName = 'A Person'
+  const password = 'pwd123'
+
+  const randomNum = Math.floor(Math.random() * 100)
+  const photoNum = randomNum < 100 ? randomNum : 99
+  const photoURL = `https://randomuser.me/api/portraits/med/women/${photoNum}.jpg`
 
   const auth = admin.auth()
   const user = await auth.createUser({
     email,
     password,
-    displayName: 'Ok',
+    displayName,
+    photoURL,
+    uid: '123456789',
   })
 
   response.send(user.displayName)
@@ -47,7 +61,7 @@ export const createUser = functions.auth
     const { displayName, email, uid, photoURL } = user
     const db = admin.database()
     const ref = db.ref(`users/${uid}`)
-    ref.set({
+    ref.update({
       displayName,
       email,
       photoURL,
@@ -61,4 +75,20 @@ export const deleteUser = functions.auth
     const db = admin.database()
     const ref = db.ref(`users/${uid}`)
     ref.remove()
+  })
+
+export const deleteParty = functions.database
+  .ref('parties/{uuid}')
+  .onDelete(async (snapshot, context) => {
+    const uuid = context.params.uuid
+    logger.log('deleting party', uuid)
+    const val = await snapshot.val()
+    const userIds = Object.keys(val.users)
+    logger.log('removing party from users:', userIds)
+    const db = admin.database()
+    await Promise.all(
+      userIds.map(async (userId) => {
+        await db.ref(`users/${userId}/parties/${uuid}`).remove()
+      })
+    )
   })
