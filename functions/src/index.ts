@@ -1,6 +1,6 @@
 import * as functions from 'firebase-functions'
 import * as admin from 'firebase-admin'
-// import axios from 'axios'
+import axios from 'axios'
 
 admin.initializeApp()
 
@@ -35,9 +35,9 @@ export const mockUser = functions.https.onRequest(async (request, response) => {
   // const mockData = res.data.results[0]
   // const email = mockData.email
   // const displayName = `${mockData.name.first} ${mockData.name.last}`
-  const email = 'a@whynotben.com'
-  const displayName = 'A Person'
-  const password = 'pwd123'
+  const email = 'a@mywebpage.cool'
+  const displayName = 'Some Person'
+  const password = 'asdfjkl;'
 
   const randomNum = Math.floor(Math.random() * 100)
   const photoNum = randomNum < 100 ? randomNum : 99
@@ -55,16 +55,21 @@ export const mockUser = functions.https.onRequest(async (request, response) => {
   response.send(user.displayName)
 })
 
+const getRandomDog = async () => {
+  const res = await axios.get('https://random.dog/woof?filter=mp4,webm')
+  return `https://random.dog/${res.data}`
+}
+
 export const createUser = functions.auth
   .user()
   .onCreate(async (user, context) => {
     const { displayName, email, uid, photoURL } = user
     const db = admin.database()
     const ref = db.ref(`users/${uid}`)
-    ref.update({
-      displayName,
+    await ref.update({
+      displayName: displayName ? displayName : 'Nameless Wonder',
       email,
-      photoURL,
+      photoURL: photoURL ? photoURL : await getRandomDog(),
     })
   })
 
