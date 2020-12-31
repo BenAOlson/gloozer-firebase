@@ -1,6 +1,8 @@
 import * as functions from 'firebase-functions'
 import * as admin from 'firebase-admin'
-import axios from 'axios'
+// import axios from 'axios'
+// import { randomBytes } from 'crypto'
+// import { v4 as uuid } from 'uuid'
 
 admin.initializeApp()
 
@@ -35,8 +37,8 @@ export const mockUser = functions.https.onRequest(async (request, response) => {
   // const mockData = res.data.results[0]
   // const email = mockData.email
   // const displayName = `${mockData.name.first} ${mockData.name.last}`
-  const email = 'a@mywebpage.cool'
-  const displayName = 'Some Person'
+  const email = 'somebody@mywebpage.cool'
+  const displayName = 'Corn Dog'
   const password = 'asdfjkl;'
 
   const randomNum = Math.floor(Math.random() * 100)
@@ -55,10 +57,13 @@ export const mockUser = functions.https.onRequest(async (request, response) => {
   response.send(user.displayName)
 })
 
-const getRandomDog = async () => {
-  const res = await axios.get('https://random.dog/woof?filter=mp4,webm')
-  return `https://random.dog/${res.data}`
-}
+// const getRandomDog = async () => {
+//   const res = await axios.get('https://random.dog/woof?filter=mp4,webm')
+//   return `https://random.dog/${res.data}`
+// }
+
+const getDicebearUrl = (uid: string) =>
+  `https://avatars.dicebear.com/4.5/api/avataaars/${uid}.svg?mode=exclude&top[]=longHair&top[]=shortHair&top[]=hijab&top[]=turban&topChance=100&mouth[]=vomit&mouth[]=tongue`
 
 export const createUser = functions.auth
   .user()
@@ -69,7 +74,8 @@ export const createUser = functions.auth
     await ref.update({
       displayName: displayName ? displayName : 'Nameless Wonder',
       email,
-      photoURL: photoURL ? photoURL : await getRandomDog(),
+      // photoURL: photoURL ?? await getRandomDog(),
+      photoURL: photoURL ?? getDicebearUrl(uid),
     })
   })
 
@@ -80,6 +86,55 @@ export const deleteUser = functions.auth
     const db = admin.database()
     const ref = db.ref(`users/${uid}`)
     ref.remove()
+  })
+
+export const deleteUserDoc = functions.database
+  .ref('users/{uid}')
+  .onDelete(async (snapshot, context) => {
+    const uid = context.params.uid
+    await admin.auth().deleteUser(uid)
+  })
+
+export const updatePartyUsers = functions.database
+  .ref('parties/{uuid}/users')
+  .onUpdate(async (snapshot, context) => {
+    const uuid = context.params.uuid
+    logger.log('updating user parties', uuid)
+    logger.log('context:', context)
+
+    const before = snapshot.before.val() ?? {}
+    const after = snapshot.after.val() ?? {}
+    const addedUsers = Object.keys(after).filter(function (el) {
+      return Object.keys(before).indexOf(el) < 0
+    })
+    const removedUsers = Object.keys(before).filter(function (el) {
+      return Object.keys(after).indexOf(el) < 0
+    })
+    logger.info('added users', addedUsers)
+    logger.info('removed users', removedUsers)
+
+    const db = admin.database()
+    await Promise.all(
+      removedUsers.map(async (userId) => {
+        await db.ref(`users/${userId}/parties/${uuid}`).remove()
+      })
+    )
+    if (addedUsers.length) {
+      const partyRef = db.ref(`parties/${uuid}`)
+      partyRef.once('value', async (snapshot) => {
+        const partyVal = snapshot.val()
+        if (partyVal) {
+          await Promise.all(
+            addedUsers.map(async (userId) => {
+              await db.ref(`users/${userId}/parties/${uuid}`).update({
+                displayName: partyVal.displayName,
+                iconName: partyVal.iconName,
+              })
+            })
+          )
+        }
+      })
+    }
   })
 
 export const deleteParty = functions.database

@@ -1,6 +1,45 @@
 {
   "rules": {
-    ".read": "now < 1608526800000", 
-    ".write": "now < 1608526800000"
+    "parties": {
+      // ".read": "now < 1608526800000",
+      // ".write": "now < 1608526800000"
+      // ".read": true,
+      // ".write": true,
+      "$puuid": {
+        ".read": "data.child('users').hasChild(auth.uid)",
+        ".write": "data.child('users').hasChild(auth.uid) || (!data.parent().child($puuid).exists() && auth != null)",
+        "displayName": {
+          ".read": "auth != null"
+        },
+        "iconName": {
+          ".read": "auth != null"
+        },
+        "users": {
+          ".read": "auth != null",
+          "$uid": {
+            ".write": "auth.uid == $uid"
+          }
+        }
+      }
+    },
+    "users": {
+      // ".read": false,
+      // ".write": false
+      "$uid": {
+        ".read": "auth.uid == $uid",
+        ".write": "auth.uid == $uid"
+      }
+    },
+    "characters": {
+      ".read": "query.orderByChild == 'party' && root.child('users/' + auth.uid + '/parties/' + query.equalTo).exists()",
+      // ".read": true,
+      ".write": false,
+      "$uid": {
+        ".read": true,
+        //Make sure user is auth'd, and that the party being written is one of theirs?
+        // ".write": "auth != null && root.child('users/' + auth.uid + '/parties/' + newData.child('party')).exists()"
+        ".write": true
+      }
+    }
   }
 }
